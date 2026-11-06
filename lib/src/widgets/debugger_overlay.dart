@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../core/just_debugger_controller.dart';
-import '../ecs/ecs_debugger_snapshot.dart';
-import '../logs/debugger_log_entry.dart';
+import '../controller/controller.dart';
+import '../snapshots/snapshots.dart';
+import 'byte_format.dart';
 
 enum _OverlaySection { ecs, performance, memory, logs }
 
@@ -33,23 +33,35 @@ extension on _LogFilter {
   };
 }
 
-class EcsDebuggerOverlay extends StatefulWidget {
-  const EcsDebuggerOverlay({
+/// A compact card over the game with four tabs — ECS, performance, memory
+/// and logs — each with its summary on the tab.
+///
+/// It shows [controller]'s latest snapshots and rebuilds when they change;
+/// it is empty while [JustDebuggerController.overlayVisible] is false.
+class DebuggerOverlay extends StatefulWidget {
+  /// An overlay for [controller], placed at [alignment] with [margin]
+  /// around it.
+  const DebuggerOverlay({
     super.key,
     required this.controller,
     this.alignment = Alignment.topRight,
     this.margin = const EdgeInsets.all(12),
   });
 
+  /// What the overlay shows.
   final JustDebuggerController controller;
+
+  /// Where the card sits in the space it is given.
   final Alignment alignment;
+
+  /// The space around the card.
   final EdgeInsets margin;
 
   @override
-  State<EcsDebuggerOverlay> createState() => _EcsDebuggerOverlayState();
+  State<DebuggerOverlay> createState() => _DebuggerOverlayState();
 }
 
-class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
+class _DebuggerOverlayState extends State<DebuggerOverlay> {
   _OverlaySection _selectedSection = _OverlaySection.ecs;
   _LogFilter _selectedLogFilter = _LogFilter.all;
 
@@ -109,10 +121,9 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
                                 summary: _summaryFor(
                                   section,
                                   snapshot: snapshot,
-                                  performanceFps: performance.currentFps,
-                                  componentCount: memory.componentCount,
+                                  performance: performance,
+                                  memory: memory,
                                   logCount: logs.length,
-                                  usingFallback: memory.usingCacheFallback,
                                 ),
                                 selected: section == _selectedSection,
                                 accentColor: primaryColor,
@@ -135,21 +146,8 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
                           child: _buildSectionContent(
                             snapshot: snapshot,
                             health: health,
-                            performanceFps: performance.currentFps,
-                            frameNumber: performance.frameNumber,
-                            lastUpdateMs: performance.lastUpdateMs,
-                            budgetRemainingMs: performance.budgetRemainingMs,
-                            isOverBudget: performance.isOverBudget,
-                            componentCount: memory.componentCount,
-                            memoryEntityCount: memory.entityCount,
-                            counters: memory.counters,
-                            usingFallback: memory.usingCacheFallback,
-                            totalPhysicalMemoryBytes:
-                                memory.totalPhysicalMemoryBytes,
-                            freePhysicalMemoryBytes:
-                                memory.freePhysicalMemoryBytes,
-                            rssBytes: memory.rssBytes,
-                            cleanupAvailable: memory.cleanupAvailable,
+                            performance: performance,
+                            memory: memory,
                             logs: logs,
                           ),
                         ),
@@ -168,16 +166,15 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
   String _summaryFor(
     _OverlaySection section, {
     required EcsDebuggerSnapshot snapshot,
-    required int performanceFps,
-    required int componentCount,
+    required PerformanceDebuggerSnapshot performance,
+    required MemoryDebuggerSnapshot memory,
     required int logCount,
-    required bool usingFallback,
   }) {
     return switch (section) {
       _OverlaySection.ecs => '${snapshot.entityCount} ent',
-      _OverlaySection.performance => '$performanceFps fps',
+      _OverlaySection.performance => '${performance.currentFps} fps',
       _OverlaySection.memory =>
-        usingFallback ? 'fallback' : '$componentCount cmp',
+        memory.usingCacheFallback ? 'fallback' : '${memory.componentCount} cmp',
       _OverlaySection.logs => '$logCount events',
     };
   }
@@ -185,19 +182,8 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
   Widget _buildSectionContent({
     required EcsDebuggerSnapshot snapshot,
     required DebuggerHealth health,
-    required int performanceFps,
-    required int frameNumber,
-    required double lastUpdateMs,
-    required double budgetRemainingMs,
-    required bool isOverBudget,
-    required int componentCount,
-    required int memoryEntityCount,
-    required Map<String, int> counters,
-    required bool usingFallback,
-    required int totalPhysicalMemoryBytes,
-    required int freePhysicalMemoryBytes,
-    required int rssBytes,
-    required bool cleanupAvailable,
+    required PerformanceDebuggerSnapshot performance,
+    required MemoryDebuggerSnapshot memory,
     required List<DebuggerLogEntry> logs,
   }) {
     switch (_selectedSection) {
@@ -251,52 +237,49 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _StatChip(label: 'FPS', value: '$performanceFps'),
-                _StatChip(label: 'Frame', value: '$frameNumber'),
+                _StatChip(label: 'FPS', value: '${performance.currentFps}'),
+                _StatChip(label: 'Frame', value: '${performance.frameNumber}'),
                 _StatChip(
                   label: 'Update',
-                  value: '${lastUpdateMs.toStringAsFixed(1)}ms',
+                  value: '${performance.lastUpdateMs.toStringAsFixed(1)}ms',
                 ),
                 _StatChip(
                   label: 'Budget',
-                  value: isOverBudget
+                  value: performance.isOverBudget
                       ? 'Over'
-                      : '${budgetRemainingMs.toStringAsFixed(1)}ms',
+                      : '${performance.budgetRemainingMs.toStringAsFixed(1)}ms',
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              isOverBudget
+              performance.isOverBudget
                   ? 'Frame budget is currently being exceeded.'
                   : 'Frame timing is within budget.',
               style: TextStyle(
-                color: isOverBudget ? Colors.orangeAccent : Colors.greenAccent,
+                color: performance.isOverBudget
+                    ? Colors.orangeAccent
+                    : Colors.greenAccent,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
         );
       case _OverlaySection.memory:
-        final hasSystemMemoryStats = totalPhysicalMemoryBytes > 0;
-        final usedPhysicalMemoryBytes = hasSystemMemoryStats
-            ? (totalPhysicalMemoryBytes - freePhysicalMemoryBytes).clamp(
-                0,
-                totalPhysicalMemoryBytes,
-              )
-            : 0;
-        const softBudgetBytes = 512 * 1024 * 1024;
+        final hasSystemMemoryStats = memory.hasSystemMemoryStats;
+        final totalBytes = memory.totalPhysicalMemoryBytes;
+        final usedBytes = memory.usedPhysicalMemoryBytes;
+        final rssBytes = memory.rssBytes;
+        final counters = memory.counters;
+        final usingFallback = memory.usingCacheFallback;
         final rssPressure = rssBytes <= 0
             ? 0.0
-            : (rssBytes / softBudgetBytes).clamp(0.0, 1.0);
+            : (rssBytes / memorySoftBudgetBytes).clamp(0.0, 1.0);
         final usageRatio = hasSystemMemoryStats
-            ? (usedPhysicalMemoryBytes / totalPhysicalMemoryBytes).clamp(
-                0.0,
-                1.0,
-              )
+            ? (usedBytes / totalBytes).clamp(0.0, 1.0)
             : rssPressure;
         final appFootprintRatio = hasSystemMemoryStats
-            ? (rssBytes / totalPhysicalMemoryBytes).clamp(0.0, 1.0)
+            ? (rssBytes / totalBytes).clamp(0.0, 1.0)
             : rssPressure;
         final poolCount = counters['pools'] ?? 0;
         final arenaCount = counters['arenas'] ?? 0;
@@ -315,8 +298,11 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _StatChip(label: 'Entities', value: '$memoryEntityCount'),
-                _StatChip(label: 'Components', value: '$componentCount'),
+                _StatChip(label: 'Entities', value: '${memory.entityCount}'),
+                _StatChip(
+                  label: 'Components',
+                  value: '${memory.componentCount}',
+                ),
                 _StatChip(label: 'Counters', value: '${counters.length}'),
                 _StatChip(
                   label: 'Cache',
@@ -344,15 +330,15 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
             Text(
               hasSystemMemoryStats
                   ? '${(usageRatio * 100).toStringAsFixed(0)}% system RAM used • '
-                        '${_formatBytes(usedPhysicalMemoryBytes)} / ${_formatBytes(totalPhysicalMemoryBytes)}'
+                        '${formatBytes(usedBytes)} / ${formatBytes(totalBytes)}'
                   : rssBytes > 0
-                  ? 'App memory pressure: ${_formatBytes(rssBytes)} used'
+                  ? 'App memory pressure: ${formatBytes(rssBytes)} used'
                   : 'RAM metrics are unavailable on this platform.',
               style: TextStyle(color: usageColor),
             ),
             const SizedBox(height: 10),
             const Text(
-              'Engine + Game Footprint',
+              'App Footprint',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
@@ -380,21 +366,25 @@ class _EcsDebuggerOverlayState extends State<EcsDebuggerOverlay> {
             const SizedBox(height: 6),
             Text(
               hasSystemMemoryStats
-                  ? 'Current game + just_game_engine: ${_formatBytes(rssBytes)} live RSS • Optimization headroom keeps ${_formatBytes(freePhysicalMemoryBytes)} free'
+                  ? 'App: ${formatBytes(rssBytes)} live RSS • '
+                        '${formatBytes(memory.freePhysicalMemoryBytes)} of '
+                        'system RAM free'
                   : rssBytes > 0
-                  ? 'Current game + just_game_engine: ${_formatBytes(rssBytes)} live RSS against a ${_formatBytes(softBudgetBytes)} soft budget'
-                  : 'Current game memory footprint is unavailable on this platform.',
+                  ? 'App: ${formatBytes(rssBytes)} live RSS against a '
+                        '${formatBytes(memorySoftBudgetBytes)} soft budget'
+                  : 'App memory footprint is unavailable on this platform.',
               style: const TextStyle(color: Colors.white70),
             ),
             if (poolCount > 0 || arenaCount > 0)
               Text(
-                'Optimization headroom is backed by just_game_engine pooling: $poolCount pools • $arenaCount arenas',
+                'Pooled memory: $poolCount pools • $arenaCount arenas',
                 style: const TextStyle(color: Colors.white70),
               ),
-            if (cleanupAvailable) ...[
+            if (memory.cleanupAvailable) ...[
               const SizedBox(height: 6),
               const Text(
-                'Free up space using just_memory cleanup for pools, arenas, and caches.',
+                'A cleanup action is attached: it can release pools, '
+                'arenas and caches.',
                 style: TextStyle(color: Colors.white70),
               ),
             ],
@@ -771,22 +761,4 @@ class _OverlayLogTile extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatBytes(int bytes) {
-  if (bytes <= 0) {
-    return '0 B';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  var value = bytes.toDouble();
-  var unitIndex = 0;
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex++;
-  }
-
-  final precision = unitIndex == 0 ? 0 : 1;
-  return '${value.toStringAsFixed(precision)} ${units[unitIndex]}';
 }

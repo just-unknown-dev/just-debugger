@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../core/just_debugger_controller.dart';
+import '../controller/controller.dart';
 
+/// A card with [controller]'s latest performance snapshot: frame rate,
+/// frame number, update time, budget and system timings.
 class PerformanceDebuggerPanel extends StatelessWidget {
+  /// A panel for [controller].
   const PerformanceDebuggerPanel({super.key, required this.controller});
 
+  /// What the panel shows.
   final JustDebuggerController controller;
 
   @override

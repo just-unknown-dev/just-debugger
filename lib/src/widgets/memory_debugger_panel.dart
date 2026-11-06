@@ -1,10 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
-import '../core/just_debugger_controller.dart';
+import '../controller/controller.dart';
+import 'byte_format.dart';
 
+/// A card with [controller]'s latest memory snapshot: counts, the cache's
+/// state, the machine's RAM (or the app's footprint when that is unknown),
+/// the published counters, and a Free Up RAM button when a cleanup can run.
 class MemoryDebuggerPanel extends StatelessWidget {
+  /// A panel for [controller].
   const MemoryDebuggerPanel({super.key, required this.controller});
 
+  /// What the panel shows.
   final JustDebuggerController controller;
 
   @override
@@ -16,10 +24,9 @@ class MemoryDebuggerPanel extends StatelessWidget {
         final theme = Theme.of(context);
         final primaryColor = theme.primaryColor;
         final availability = snapshot.availabilityRatio.clamp(0.0, 1.0);
-        const softBudgetBytes = 512 * 1024 * 1024;
         final rssPressure = snapshot.rssBytes <= 0
             ? 0.0
-            : (snapshot.rssBytes / softBudgetBytes).clamp(0.0, 1.0);
+            : (snapshot.rssBytes / memorySoftBudgetBytes).clamp(0.0, 1.0);
 
         return Card(
           child: SingleChildScrollView(
@@ -49,14 +56,14 @@ class MemoryDebuggerPanel extends StatelessWidget {
                     if (snapshot.rssBytes > 0)
                       _MemoryStat(
                         label: 'App RSS',
-                        value: _formatBytes(snapshot.rssBytes),
+                        value: formatBytes(snapshot.rssBytes),
                       ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
                   snapshot.usingCacheFallback
-                      ? 'CacheManager is running in memory fallback mode.'
+                      ? 'The cache is running in memory fallback mode.'
                       : 'Primary cache backend is available.',
                   style: TextStyle(
                     color: snapshot.usingCacheFallback
@@ -84,8 +91,8 @@ class MemoryDebuggerPanel extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     '${(availability * 100).toStringAsFixed(0)}% free • '
-                    '${_formatBytes(snapshot.freePhysicalMemoryBytes)} available '
-                    'of ${_formatBytes(snapshot.totalPhysicalMemoryBytes)}',
+                    '${formatBytes(snapshot.freePhysicalMemoryBytes)} available '
+                    'of ${formatBytes(snapshot.totalPhysicalMemoryBytes)}',
                     style: theme.textTheme.bodySmall,
                   ),
                 ] else if (snapshot.rssBytes > 0) ...[
@@ -101,7 +108,7 @@ class MemoryDebuggerPanel extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'OS-wide free RAM is unavailable here, so this shows app memory pressure '
-                    'against a ${_formatBytes(softBudgetBytes)} soft budget.',
+                    'against a ${formatBytes(memorySoftBudgetBytes)} soft budget.',
                     style: theme.textTheme.bodySmall,
                   ),
                 ] else
@@ -111,16 +118,18 @@ class MemoryDebuggerPanel extends StatelessWidget {
                 const SizedBox(height: 12),
                 if (controller.canCleanupMemory)
                   ElevatedButton.icon(
-                    onPressed: () async {
-                      await controller.requestMemoryCleanup();
-                    },
+                    // Off while a cleanup runs, so one press runs one.
+                    onPressed: controller.isCleaningMemory
+                        ? null
+                        : () => unawaited(controller.requestMemoryCleanup()),
                     icon: const Icon(Icons.cleaning_services_outlined),
                     label: const Text('Free Up RAM'),
                   ),
                 if (controller.canCleanupMemory) ...[
                   const SizedBox(height: 8),
                   Text(
-                    'Uses just_memory to release tracked pools, arenas, and temporary caches.',
+                    'Runs the attached cleanup action to release pools, '
+                    'arenas and caches.',
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -172,22 +181,4 @@ class _MemoryStat extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatBytes(int bytes) {
-  if (bytes <= 0) {
-    return '0 B';
-  }
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  var value = bytes.toDouble();
-  var unitIndex = 0;
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex++;
-  }
-
-  final precision = unitIndex == 0 ? 0 : 1;
-  return '${value.toStringAsFixed(precision)} ${units[unitIndex]}';
 }

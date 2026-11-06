@@ -1,14 +1,14 @@
+/// Visual ECS and runtime debugging tools for the Just Game Engine — or any
+/// runtime that reports its statistics as plain maps.
+///
+/// - `JustDebuggerController` holds the latest snapshots, the log and the
+///   overlay's visibility, and polls stats providers with `bind`.
+/// - `JustDebuggerView` wraps a game with a `DebuggerOverlay` and an
+///   optional inspector panel.
+/// - `EcsDebuggerPanel`, `PerformanceDebuggerPanel`, `MemoryDebuggerPanel`
+///   and `DebuggerLogConsole` can be placed on their own.
 library;
 
-export 'src/core/just_debugger_controller.dart';
-export 'src/ecs/ecs_debugger_snapshot.dart';
-export 'src/integrations/just_game_engine_binding.dart';
-export 'src/logs/debugger_log_entry.dart';
-export 'src/memory/memory_debugger_snapshot.dart';
-export 'src/performance/performance_debugger_snapshot.dart';
-export 'src/widgets/debugger_log_console.dart';
-export 'src/widgets/ecs_debugger_overlay.dart';
-export 'src/widgets/ecs_debugger_panel.dart';
-export 'src/widgets/just_debugger_view.dart';
-export 'src/widgets/memory_debugger_panel.dart';
-export 'src/widgets/performance_debugger_panel.dart';
+export 'src/controller/controller.dart';
+export 'src/snapshots/snapshots.dart';
+export 'src/widgets/widgets.dart';

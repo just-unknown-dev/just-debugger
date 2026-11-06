@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../core/just_debugger_controller.dart';
+import '../controller/controller.dart';
 
+/// A scrolling inspector of [controller]'s latest ECS snapshot: counts,
+/// component usage, system timings and health warnings.
 class EcsDebuggerPanel extends StatelessWidget {
+  /// A panel for [controller].
   const EcsDebuggerPanel({super.key, required this.controller});
 
+  /// What the panel shows.
   final JustDebuggerController controller;
 
   @override

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../core/just_debugger_controller.dart';
-import '../logs/debugger_log_entry.dart';
+import '../controller/controller.dart';
+import '../snapshots/snapshots.dart';
 
 enum _LogConsoleFilter { all, info, warning, error }
 
@@ -14,9 +14,15 @@ extension on _LogConsoleFilter {
   };
 }
 
+/// [controller]'s log, newest first, with counts per level, level filters
+/// and a Clear Logs button.
+///
+/// The list fills the height it is given, so give it a bounded one.
 class DebuggerLogConsole extends StatefulWidget {
+  /// A console for [controller].
   const DebuggerLogConsole({super.key, required this.controller});
 
+  /// Whose log the console shows.
   final JustDebuggerController controller;
 
   @override

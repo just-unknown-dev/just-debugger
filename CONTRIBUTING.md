@@ -77,6 +77,16 @@ fix(debugger): correct log panel filtering
 
 This package is a **Flutter package**.
 
+### Layout
+
+`lib/just_debugger.dart` is the only public library. `lib/src/` is organised by feature, bottom to top:
+
+- `snapshots/`: what the debugger shows, read from plain stats maps (imports only `package:flutter/foundation.dart`);
+- `controller/`: `JustDebuggerController` and `DebuggerHealth`;
+- `widgets/`: the overlay, the view and the panels.
+
+Each folder has one barrel named after it (`snapshots/snapshots.dart`). A feature imports only its own layer or below. Helpers that are not exported are marked `@internal`. `test/` mirrors `lib/src/`, and `test/library_layout_test.dart` checks all of this.
+
 ### Priorities
 
 - clarity first
